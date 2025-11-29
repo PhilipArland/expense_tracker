@@ -280,3 +280,9 @@ input[type="number"]::-webkit-inner-spin-button {
 input[type="number"] {
     -moz-appearance: textfield;
 }
+
+.navbar-brand img {
+    height: 30px;
+    width: auto;
+    margin-right: 10px;
+}
