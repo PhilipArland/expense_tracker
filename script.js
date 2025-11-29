@@ -206,7 +206,7 @@ function updateStats() {
 
 function addRow() {
     const data = getMonthData();
-    data.expenseRows.push({
+    data.expenseRows.unshift({
         type: '',
         monday: 0,
         tuesday: 0,
@@ -217,6 +217,7 @@ function addRow() {
     saveToLocalStorage();
     renderExpenseTable();
 }
+
 
 function deleteRow(index) {
     const data = getMonthData();
@@ -250,71 +251,100 @@ function renderExpenseTable() {
 
     if (data.expenseRows.length === 0) {
         tbody.innerHTML = `
-                    <tr>
-                        <td colspan="8" class="text-center text-muted py-4">
-                            No expense rows yet. Click "Add Row" to start tracking!
-                        </td>
-                    </tr>
-                `;
+            <tr>
+                <td colspan="8" class="text-center text-muted py-4">
+                    No expense rows yet. Click "Add Row" to start tracking!
+                </td>
+            </tr>
+        `;
         return;
     }
 
+    // Render the rows with drag-and-drop functionality
     tbody.innerHTML = data.expenseRows.map((row, index) => {
         const total = calculateRowTotal(row);
         return `
-                    <tr>
-                        <td>
-                            <input type="text" 
-                                   value="${row.type}" 
-                                   onchange="updateRowValue(${index}, 'type', this.value)"
-                                   placeholder="e.g., Food, Transport"
-                                   style="width: 150px; text-align: left;">
-                        </td>
-                        <td>
-                            <input type="number" 
-                                   value="${row.monday || ''}" 
-                                   onchange="updateRowValue(${index}, 'monday', this.value)"
-                                   placeholder="0"
-                                   step="0.01">
-                        </td>
-                        <td>
-                            <input type="number" 
-                                   value="${row.tuesday || ''}" 
-                                   onchange="updateRowValue(${index}, 'tuesday', this.value)"
-                                   placeholder="0"
-                                   step="0.01">
-                        </td>
-                        <td>
-                            <input type="number" 
-                                   value="${row.wednesday || ''}" 
-                                   onchange="updateRowValue(${index}, 'wednesday', this.value)"
-                                   placeholder="0"
-                                   step="0.01">
-                        </td>
-                        <td>
-                            <input type="number" 
-                                   value="${row.thursday || ''}" 
-                                   onchange="updateRowValue(${index}, 'thursday', this.value)"
-                                   placeholder="0"
-                                   step="0.01">
-                        </td>
-                        <td>
-                            <input type="number" 
-                                   value="${row.friday || ''}" 
-                                   onchange="updateRowValue(${index}, 'friday', this.value)"
-                                   placeholder="0"
-                                   step="0.01">
-                        </td>
-                        <td class="total-amount">$${total.toFixed(2)}</td>
-                        <td>
-                            <button class="delete-row-btn" onclick="deleteRow(${index})">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </td>
-                    </tr>
-                `;
+            <tr draggable="true" id="row-${index}" data-index="${index}" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="drop(event)">
+                <td>
+                    <input type="text" 
+                           value="${row.type}" 
+                           onchange="updateRowValue(${index}, 'type', this.value)"
+                           placeholder="e.g., Food, Transport"
+                           style="width: 150px; text-align: left;">
+                </td>
+                <td>
+                    <input type="number" 
+                           value="${row.monday || ''}" 
+                           onchange="updateRowValue(${index}, 'monday', this.value)"
+                           placeholder="0"
+                           step="0.01">
+                </td>
+                <td>
+                    <input type="number" 
+                           value="${row.tuesday || ''}" 
+                           onchange="updateRowValue(${index}, 'tuesday', this.value)"
+                           placeholder="0"
+                           step="0.01">
+                </td>
+                <td>
+                    <input type="number" 
+                           value="${row.wednesday || ''}" 
+                           onchange="updateRowValue(${index}, 'wednesday', this.value)"
+                           placeholder="0"
+                           step="0.01">
+                </td>
+                <td>
+                    <input type="number" 
+                           value="${row.thursday || ''}" 
+                           onchange="updateRowValue(${index}, 'thursday', this.value)"
+                           placeholder="0"
+                           step="0.01">
+                </td>
+                <td>
+                    <input type="number" 
+                           value="${row.friday || ''}" 
+                           onchange="updateRowValue(${index}, 'friday', this.value)"
+                           placeholder="0"
+                           step="0.01">
+                </td>
+                <td class="total-amount">$${total.toFixed(2)}</td>
+                <td>
+                    <button class="delete-row-btn" onclick="deleteRow(${index})">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
     }).join('');
 }
+
+function dragStart(event) {
+    event.dataTransfer.setData("text", event.target.dataset.index);
+}
+
+function dragOver(event) {
+    event.preventDefault();
+}
+
+function drop(event) {
+    event.preventDefault();
+
+    const draggedIndex = event.dataTransfer.getData("text");
+    const droppedIndex = event.target.closest("tr").dataset.index;
+
+    if (draggedIndex === droppedIndex) {
+        return;
+    }
+
+    const data = getMonthData();
+    const draggedRow = data.expenseRows.splice(draggedIndex, 1)[0];
+    data.expenseRows.splice(droppedIndex, 0, draggedRow);
+
+    saveToLocalStorage();
+    renderExpenseTable();
+    updateStats();
+}
+
 
 loadFromLocalStorage();
 updateMonthDisplay();
