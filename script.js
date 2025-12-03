@@ -351,4 +351,194 @@ updateMonthDisplay();
 loadMonthData();
 updateStats();
 renderExpenseTable();
-updateYearlyChart(); 
+updateYearlyChart();
+
+/* ---------------------------------------------------------
+   ADD-ONS MODULE (APPENDED - DOES NOT MODIFY ORIGINAL FUNCTIONS)
+   - Adds monthlyData[monthKey].addons where missing
+   - Add-ons are additional income (included in totalIncome, balance, yearly chart)
+--------------------------------------------------------- */
+
+/* Initialize addons structures for existing saved data and current month */
+function ensureAddonsStructure() {
+    // Ensure monthlyData exists (in case loadFromLocalStorage created it)
+    if (!monthlyData || typeof monthlyData !== 'object') monthlyData = {};
+
+    // Ensure each month entry has an addons array
+    Object.keys(monthlyData).forEach(key => {
+        if (!monthlyData[key].addons) {
+            monthlyData[key].addons = [];
+        }
+    });
+
+    // Ensure current month entry exists with addons
+    const currentKey = getMonthKey();
+    if (!monthlyData[currentKey]) {
+        monthlyData[currentKey] = {
+            firstPaycheck: 0,
+            secondPaycheck: 0,
+            expenseRows: [],
+            addons: []
+        };
+    } else if (!monthlyData[currentKey].addons) {
+        monthlyData[currentKey].addons = [];
+    }
+}
+
+/* Add-on API: add, delete, update, render */
+function addAddon() {
+    const data = getMonthData();
+    if (!data.addons) data.addons = [];
+    data.addons.unshift({
+        description: '',
+        amount: 0
+    });
+    saveToLocalStorage();
+    renderAddonsTable();
+    // Recalculate stats/chart to include new addon
+    updateStats();
+    updateYearlyChart();
+}
+
+function deleteAddon(index) {
+    const data = getMonthData();
+    if (!data.addons) return;
+    data.addons.splice(index, 1);
+    saveToLocalStorage();
+    renderAddonsTable();
+    updateStats();
+    updateYearlyChart();
+}
+
+function updateAddonValue(index, field, value) {
+    const data = getMonthData();
+    if (!data.addons || !data.addons[index]) return;
+
+    if (field === 'amount') {
+        data.addons[index][field] = parseFloat(value) || 0;
+    } else {
+        data.addons[index][field] = value;
+    }
+
+    saveToLocalStorage();
+    renderAddonsTable();
+    updateStats();
+    updateYearlyChart();
+}
+
+function renderAddonsTable() {
+    const data = getMonthData();
+    const tbody = document.getElementById('addonsTableBody');
+
+    if (!tbody) return; // If HTML for addons is not present, do nothing
+
+    if (!data.addons || data.addons.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="4" class="text-center text-muted py-4">
+                    No add-ons yet. Click "Add Add-On" to add extra income!
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = data.addons.map((row, index) => {
+        return `
+            <tr>
+                <td>
+                    <input type="text"
+                        value="${row.description}"
+                        placeholder="e.g., Savings, Gift"
+                        onchange="updateAddonValue(${index}, 'description', this.value)"
+                        style="width:150px; text-align:left;">
+                </td>
+                <td>
+                    <input type="number"
+                        value="${row.amount || ''}"
+                        placeholder="0"
+                        step="0.01"
+                        onchange="updateAddonValue(${index}, 'amount', this.value)">
+                </td>
+                <td class="total-amount">₱${(parseFloat(row.amount) || 0).toFixed(2)}</td>
+                <td>
+                    <button class="delete-row-btn" onclick="deleteAddon(${index})">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+/* ------------------------------------------------------------------
+   SAFE EXTENSIONS: wrap the original getYearlyData and updateStats
+   to include add-ons while keeping original implementations intact.
+   We capture originals, then provide extended versions that call them.
+   ------------------------------------------------------------------ */
+
+(function extendForAddons() {
+    // Keep originals by reference
+    const originalGetYearlyData = getYearlyData;
+    const originalUpdateStats = updateStats;
+
+    // Extended getYearlyData: call original, then add add-ons into monthly incomes
+    getYearlyData = function () {
+        const yearly = originalGetYearlyData();
+
+        const year = currentDate.getFullYear();
+        for (let month = 0; month < 12; month++) {
+            const key = `${year}-${month}`;
+            const data = monthlyData[key];
+            if (data && Array.isArray(data.addons) && data.addons.length > 0) {
+                const addonSum = data.addons.reduce((sum, a) => sum + (parseFloat(a.amount) || 0), 0);
+                // Add to income and balance for that month
+                if (typeof yearly[month].income === 'number') yearly[month].income += addonSum;
+                if (typeof yearly[month].balance === 'number') yearly[month].balance += addonSum;
+            }
+        }
+
+        return yearly;
+    };
+
+    // Extended updateStats: call original updateStats then patch totalIncome & balance to include add-ons
+    updateStats = function () {
+        // Call original which sets base totalIncome from paychecks and balance accordingly
+        originalUpdateStats();
+
+        const data = getMonthData();
+        const addonTotal = data.addons ? data.addons.reduce((s, a) => s + (parseFloat(a.amount) || 0), 0) : 0;
+
+        // Update totalIncome display: base paychecks + addons
+        const incomeElement = document.getElementById('totalIncome');
+        if (incomeElement) {
+            const baseIncome = (data.firstPaycheck || 0) + (data.secondPaycheck || 0);
+            incomeElement.textContent = (baseIncome + addonTotal).toFixed(2);
+        }
+
+        // Recompute expense (original computed and updated expense element already)
+        const expense = data.expenseRows.reduce((total, row) => {
+            return total +
+                (parseFloat(row.monday) || 0) +
+                (parseFloat(row.tuesday) || 0) +
+                (parseFloat(row.wednesday) || 0) +
+                (parseFloat(row.thursday) || 0) +
+                (parseFloat(row.friday) || 0);
+        }, 0);
+
+        // Update balance display
+        const balanceElement = document.getElementById('balance');
+        if (balanceElement) {
+            const baseIncome = (data.firstPaycheck || 0) + (data.secondPaycheck || 0);
+            balanceElement.textContent = (baseIncome + addonTotal - expense).toFixed(2);
+        }
+    };
+})();
+
+/* Ensure addons exist after loading saved data, render addons if HTML present,
+   and recalc stats/chart to reflect addons. */
+
+ensureAddonsStructure();
+renderAddonsTable();
+updateStats();
+updateYearlyChart();
