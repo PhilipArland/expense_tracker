@@ -165,6 +165,7 @@ function changeMonth(direction) {
     updateMonthDisplay();
     loadMonthData();
     updateStats();
+    renderAddonsTable();
     renderExpenseTable();
     updateYearlyChart();
 }
@@ -173,6 +174,7 @@ function loadMonthData() {
     const data = getMonthData();
     document.getElementById('firstPaycheck').value = data.firstPaycheck || '';
     document.getElementById('secondPaycheck').value = data.secondPaycheck || '';
+    renderAddonsTable();
 }
 
 function updateIncome() {
@@ -353,18 +355,8 @@ updateStats();
 renderExpenseTable();
 updateYearlyChart();
 
-/* ---------------------------------------------------------
-   ADD-ONS MODULE (APPENDED - DOES NOT MODIFY ORIGINAL FUNCTIONS)
-   - Adds monthlyData[monthKey].addons where missing
-   - Add-ons are additional income (included in totalIncome, balance, yearly chart)
---------------------------------------------------------- */
-
-/* Initialize addons structures for existing saved data and current month */
 function ensureAddonsStructure() {
-    // Ensure monthlyData exists (in case loadFromLocalStorage created it)
     if (!monthlyData || typeof monthlyData !== 'object') monthlyData = {};
-
-    // Ensure each month entry has an addons array
     Object.keys(monthlyData).forEach(key => {
         if (!monthlyData[key].addons) {
             monthlyData[key].addons = [];
@@ -385,7 +377,6 @@ function ensureAddonsStructure() {
     }
 }
 
-/* Add-on API: add, delete, update, render */
 function addAddon() {
     const data = getMonthData();
     if (!data.addons) data.addons = [];
@@ -395,7 +386,6 @@ function addAddon() {
     });
     saveToLocalStorage();
     renderAddonsTable();
-    // Recalculate stats/chart to include new addon
     updateStats();
     updateYearlyChart();
 }
